@@ -11,6 +11,48 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 
+type ReadingExportRow = {
+  created_at: string;
+  device_id: string;
+  devices: { esp_id: string; name: string } | null;
+  soil_1: number | null;
+  soil_2: number | null;
+  soil_3: number | null;
+  soil_4: number | null;
+  temp_1: number | null;
+  hum_1: number | null;
+  temp_2: number | null;
+  hum_2: number | null;
+};
+
+type CsvRow = {
+  timestamp: string;
+  esp_id: string;
+  name: string;
+  soil_1: number | null;
+  soil_2: number | null;
+  soil_3: number | null;
+  soil_4: number | null;
+  temp_1: number | null;
+  hum_1: number | null;
+  temp_2: number | null;
+  hum_2: number | null;
+};
+
+const CSV_COLUMNS: (keyof CsvRow)[] = [
+  "timestamp",
+  "esp_id",
+  "name",
+  "soil_1",
+  "soil_2",
+  "soil_3",
+  "soil_4",
+  "temp_1",
+  "hum_1",
+  "temp_2",
+  "hum_2",
+];
+
 export default function ExportCSVDialog() {
   const [open, setOpen] = useState(false);
   const [start, setStart] = useState("");
@@ -38,7 +80,8 @@ export default function ExportCSVDialog() {
       )
       .gte("created_at", start)
       .lte("created_at", end)
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true })
+      .overrideTypes<ReadingExportRow[], { merge: false }>();
 
     setBusy(false);
     if (error) {
@@ -46,10 +89,10 @@ export default function ExportCSVDialog() {
       return;
     }
 
-    const rows = (data as any[]).map((r) => ({
+    const rows: CsvRow[] = (data ?? []).map((r) => ({
       timestamp: r.created_at,
-      esp_id: r.devices.esp_id,
-      name: r.devices.name,
+      esp_id: r.devices?.esp_id ?? "",
+      name: r.devices?.name ?? "",
       soil_1: r.soil_1,
       soil_2: r.soil_2,
       soil_3: r.soil_3,
@@ -60,12 +103,9 @@ export default function ExportCSVDialog() {
       hum_2: r.hum_2,
     }));
 
-    const header = Object.keys(
-      rows[0] || { timestamp: "", esp_id: "", name: "" }
-    );
     const csv = [
-      header.join(","),
-      ...rows.map((r) => header.map((k) => r[k] ?? "").join(",")),
+      CSV_COLUMNS.join(","),
+      ...rows.map((r) => CSV_COLUMNS.map((k) => r[k] ?? "").join(",")),
     ].join("\n");
 
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
