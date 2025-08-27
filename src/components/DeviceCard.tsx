@@ -13,18 +13,24 @@ import type { DeviceLatest } from "@/lib/types";
 export default function DeviceCard({ device }: { device: DeviceLatest }) {
   const r = device.latest;
   const ts = r ? new Date(r.created_at) : null;
-  const stale = ts ? Date.now() - ts.getTime() > 10 * 60 * 1000 : true;
+  const stale = ts ? Date.now() - ts.getTime() > 12500 : true;
 
   return (
-    <Card className={stale ? "ring-2 ring-red-400" : ""}>
+    <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">{device.name}</CardTitle>
           <Badge variant="outline">{device.esp_id}</Badge>
         </div>
-        {/* <div className="text-xs text-muted-foreground">
-          {stale ? "Status: Stale" : "Status: Fresh"}
-        </div> */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Status:</span>
+          <Badge 
+            variant={stale ? "destructive" : "default"}
+            className={stale ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"}
+          >
+            {stale ? "Stale" : "Fresh"}
+          </Badge>
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-3">
