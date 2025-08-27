@@ -16,7 +16,7 @@ export default function DeviceCard({ device }: { device: DeviceLatest }) {
   const stale = ts ? Date.now() - ts.getTime() > 10 * 60 * 1000 : true;
 
   return (
-    <Card className={stale ? "ring-4 ring-red-500" : ""}>
+    <Card className={stale ? "ring-2 ring-red-400" : ""}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">{device.name}</CardTitle>
