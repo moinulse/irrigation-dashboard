@@ -16,15 +16,15 @@ export default function DeviceCard({ device }: { device: DeviceLatest }) {
   const stale = ts ? Date.now() - ts.getTime() > 10 * 60 * 1000 : true;
 
   return (
-    <Card className={stale ? "ring-1 ring-amber-400" : ""}>
+    <Card className={stale ? "ring-4 ring-red-500" : ""}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">{device.name}</CardTitle>
           <Badge variant="outline">{device.esp_id}</Badge>
         </div>
-        <div className="text-xs text-muted-foreground">
+        {/* <div className="text-xs text-muted-foreground">
           {stale ? "Status: Stale" : "Status: Fresh"}
-        </div>
+        </div> */}
       </CardHeader>
 
       <CardContent className="space-y-3">
@@ -62,7 +62,7 @@ export default function DeviceCard({ device }: { device: DeviceLatest }) {
         )}
       </CardContent>
 
-      <CardFooter className="text-xs text-muted-foreground">
+      <CardFooter className="text-sm text-muted-foreground">
         {ts ? (
           <>Updated {formatDistanceToNow(ts, { addSuffix: true })}</>
         ) : (
