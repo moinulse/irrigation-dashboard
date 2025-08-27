@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function App() {
   const [sessionChecked, setSessionChecked] = useState(false);
   const [authed, setAuthed] = useState(false);
-  const { devices, isLoading, error } = useRealtimeDevices();
+  const { devices, isLoading, error } = useRealtimeDevices(authed);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
