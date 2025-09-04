@@ -42,7 +42,7 @@ export default function App() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
             <div className="size-5 rounded bg-primary" />
-            <h1 className="text-lg font-semibold">Tuaran Sabah Farm</h1>
+            <h1 className="text-lg font-semibold">Batang Kali Farm</h1>
           </div>
           <div className="flex items-center gap-2">
             <ExportCSVDialog />
