@@ -54,8 +54,6 @@ export function useRealtimeDevices(enabled: boolean = true) {
 
   // Integrate realtime subscription with query lifecycle
   useEffect(() => {
-    if (!enabled || !query.data) return;
-
     // Subscribe to changes in readings table only
     const readingsChannel = supabase
       .channel("readings-changes")
