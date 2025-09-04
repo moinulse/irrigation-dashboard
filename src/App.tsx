@@ -56,8 +56,8 @@ export default function App() {
       {/* Content */}
       <main className="mx-auto max-w-6xl p-4">
         {isLoading && devices.length === 0 ? (
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-            {Array.from({ length: 8 }).map((_, i) => (
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
               <Skeleton key={i} className="h-44 w-full" />
             ))}
           </div>
@@ -66,7 +66,7 @@ export default function App() {
             <p className="mb-3 text-sm text-muted-foreground">
               Showing {devices.length} zones
             </p>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-3">
               {devices.map((d) => (
                 <DeviceCard key={d.id} device={d} />
               ))}
