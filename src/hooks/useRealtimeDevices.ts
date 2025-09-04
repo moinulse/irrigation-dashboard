@@ -48,7 +48,7 @@ export function useRealtimeDevices(enabled: boolean = true) {
     queryKey: ["devices"],
     queryFn: fetchLatestDevicesData,
     enabled,
-    refetchInterval: enabled ? 2 * 60 * 1000 : false,
+    refetchInterval: enabled ? 2 * 60 * 1000 : false, // 2 minutes
     staleTime: 2000,
   });
 
@@ -66,30 +66,9 @@ export function useRealtimeDevices(enabled: boolean = true) {
           schema: "public",
           table: "readings",
         },
-        (payload) => {
-          console.log("New reading inserted:", payload.new);
-
-          // Optimistically update the cache with new reading
-          queryClient.setQueryData<DeviceLatest[]>(["devices"], (oldData) => {
-            if (!oldData) return oldData;
-
-            const newReading = payload.new as Reading;
-            return oldData.map((device) => {
-              if (device.id === newReading.device_id) {
-                if (
-                  !device.latest ||
-                  new Date(newReading.created_at) >
-                    new Date(device.latest.created_at)
-                ) {
-                  return {
-                    ...device,
-                    latest: newReading,
-                  };
-                }
-              }
-              return device;
-            });
-          });
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        (_payload) => {
+          queryClient.invalidateQueries({ queryKey: ["devices"] });
         }
       )
       .subscribe();
