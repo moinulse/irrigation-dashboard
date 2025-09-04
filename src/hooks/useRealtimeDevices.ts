@@ -44,46 +44,46 @@ async function fetchLatestDevicesData(): Promise<DeviceLatest[]> {
 export function useRealtimeDevices(enabled: boolean = true) {
   const queryClient = useQueryClient();
 
-  const {
-    data: devices = [],
-    isLoading,
-    error,
-    refetch
-  } = useQuery({
-    queryKey: ['devices'],
+  const query = useQuery({
+    queryKey: ["devices"],
     queryFn: fetchLatestDevicesData,
     enabled,
-    refetchInterval: enabled ? 60000 : false,
-    staleTime: 5000,
+    refetchInterval: enabled ? 2 * 60 * 1000 : false,
+    staleTime: 2000,
   });
 
+  // Integrate realtime subscription with query lifecycle
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !query.data) return;
 
     // Subscribe to changes in readings table only
     const readingsChannel = supabase
-      .channel('readings-changes')
+      .channel("readings-changes")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'readings',
+          event: "INSERT",
+          schema: "public",
+          table: "readings",
         },
         (payload) => {
-          console.log('New reading inserted:', payload.new);
-          
+          console.log("New reading inserted:", payload.new);
+
           // Optimistically update the cache with new reading
-          queryClient.setQueryData<DeviceLatest[]>(['devices'], (oldData) => {
+          queryClient.setQueryData<DeviceLatest[]>(["devices"], (oldData) => {
             if (!oldData) return oldData;
-            
+
             const newReading = payload.new as Reading;
-            return oldData.map(device => {
+            return oldData.map((device) => {
               if (device.id === newReading.device_id) {
-                if (!device.latest || new Date(newReading.created_at) > new Date(device.latest.created_at)) {
+                if (
+                  !device.latest ||
+                  new Date(newReading.created_at) >
+                    new Date(device.latest.created_at)
+                ) {
                   return {
                     ...device,
-                    latest: newReading
+                    latest: newReading,
                   };
                 }
               }
@@ -98,12 +98,12 @@ export function useRealtimeDevices(enabled: boolean = true) {
     return () => {
       supabase.removeChannel(readingsChannel);
     };
-  }, [queryClient, enabled]);
+  }, [queryClient, enabled, query.data]);
 
   return {
-    devices,
-    isLoading,
-    error,
-    refetch
+    devices: query.data || [],
+    isLoading: query.isLoading,
+    error: query.error,
+    refetch: query.refetch,
   };
 }
