@@ -82,10 +82,9 @@ export function useRealtimeDevices(enabled: boolean = true) {
 
     subscriptionRef.current = supabase
       .channel("readings-changes")
-      .on(
-        "postgres_changes",
+      .on("postgres_changes",
         {
-          event: "INSERT,UPDATE",
+          event: "*",
           schema: "public",
           table: "readings",
         },
