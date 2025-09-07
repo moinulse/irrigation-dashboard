@@ -30,22 +30,30 @@ export function useRealtimeDevices(enabled: boolean = true) {
       if (!devicesQuery.data || devicesQuery.data.length === 0)
         return new Map();
       const ids = devicesQuery.data.map((d) => d.id);
-      const { data, error } = await supabase
-        .from("readings")
-        .select(
-          `
+       const promises = ids.map((id) =>
+         supabase
+           .from("readings")
+           .select(
+             `
           id, device_id, created_at,
           soil_1, soil_2, soil_3, soil_4,
           temp_1, hum_1, temp_2, hum_2
         `
-        )
-        .in("device_id", ids)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
+           )
+           .eq("device_id", id)
+           .order("created_at", { ascending: false })
+           .limit(1)
+       );
+
+      const results = await Promise.all(promises);
 
       const latestById = new Map<string, Reading>();
-      (data || []).forEach((r) => {
-        if (!latestById.has(r.device_id)) latestById.set(r.device_id, r);
+      results.forEach(({ data, error }) => {
+        if (error) throw error;
+        if (data && data.length > 0) {
+          const r = data[0];
+          latestById.set(r.device_id, r);
+        }
       });
       return latestById;
     },
