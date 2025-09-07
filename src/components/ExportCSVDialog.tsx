@@ -11,6 +11,14 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { formatKLDateTimeParts } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { useQuery } from "@tanstack/react-query";
 
 type ReadingExportRow = {
   created_at: string;
@@ -59,22 +67,51 @@ const CSV_COLUMNS: (keyof CsvRow)[] = [
 const toUtcIso = (s: string, inclusiveEnd = false) => {
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return null;
-  // make the end inclusive so you don't miss the final minute
-  return inclusiveEnd
-    ? new Date(d.getTime() + 59_999).toISOString()
-    : d.toISOString();
+  if (inclusiveEnd) {
+    d.setHours(23, 59, 59, 999);
+  } else {
+    d.setHours(0, 0, 0, 0);
+  }
+  return d.toISOString();
 };
 
 export default function ExportCSVDialog() {
   const [open, setOpen] = useState(false);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const [zone, setZone] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const {
+    data: zones = [],
+    isLoading: zonesLoading,
+    error: zonesError,
+  } = useQuery({
+    queryKey: ["zones"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("devices")
+        .select("id, esp_id, name")
+        .not("name", "is", null);
+      if (error) throw error;
+      return [...new Set(data?.map((d) => d.name) || [])]; // Distinct zones
+    },
+    enabled: open,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  if (zonesError) {
+    setErr("Failed to load zones.");
+  }
+
   const run = async () => {
     if (!start || !end) {
-      setErr("Choose start & end.");
+      setErr("Choose start & end dates.");
+      return;
+    }
+    if (!zone) {
+      setErr("Select a zone.");
       return;
     }
     setBusy(true);
@@ -87,20 +124,27 @@ export default function ExportCSVDialog() {
       setErr("Invalid date(s).");
       return;
     }
-    const { data, error } = await supabase
+    let query = supabase
       .from("readings")
       .select(
         `created_at, device_id,
         soil_1, soil_2, soil_3, soil_4,
         temp_1, hum_1, temp_2, hum_2,
-        devices!inner ( esp_id, name )
+        devices!inner ( esp_id, name, id )  // Added zone to select
         `
       )
       .gte("created_at", startIso)
       .lte("created_at", endIso)
-      .order("created_at", { ascending: true })
-      .overrideTypes<ReadingExportRow[], { merge: false }>();
+      .order("created_at", { ascending: true });
 
+    // New: Filter by zone if selected
+    if (zone) {
+      query = query.eq("devices.name", zone);
+    }
+    const { data, error } = await query.overrideTypes<
+      ReadingExportRow[],
+      { merge: false }
+    >();
     setBusy(false);
     if (error) {
       setErr(error.message);
@@ -134,9 +178,7 @@ export default function ExportCSVDialog() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `readings_${new Date()
-      .toISOString()
-      .replace(/[:]/g, "-")}.csv`;
+    a.download = `BK_${zone}_${new Date().toISOString().split("T")[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     URL.revokeObjectURL(url);
@@ -159,7 +201,7 @@ export default function ExportCSVDialog() {
               <Label htmlFor="start">Start (UTC)</Label>
               <Input
                 id="start"
-                type="datetime-local"
+                type="date"
                 value={start}
                 onChange={(e) => setStart(e.target.value)}
               />
@@ -168,11 +210,30 @@ export default function ExportCSVDialog() {
               <Label htmlFor="end">End (UTC)</Label>
               <Input
                 id="end"
-                type="datetime-local"
+                type="date"
                 value={end}
                 onChange={(e) => setEnd(e.target.value)}
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="zone">Zone</Label>
+            <Select value={zone} onValueChange={setZone}>
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    zonesLoading ? "Loading zones..." : "Select a zone"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {zones.map((z) => (
+                  <SelectItem key={z} value={z}>
+                    {z}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           {err && <p className="text-sm text-destructive">{err}</p>}
           <div className="flex justify-end gap-2">
