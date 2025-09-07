@@ -85,7 +85,7 @@ export function useRealtimeDevices(enabled: boolean = true) {
       .on(
         "postgres_changes",
         {
-          event: "*", // Listen to INSERT, UPDATE, DELETE for completeness
+          event: "INSERT,UPDATE",
           schema: "public",
           table: "readings",
         },
@@ -96,12 +96,12 @@ export function useRealtimeDevices(enabled: boolean = true) {
             payload.new || payload.old
           );
 
-          // Optimistically update the readings cache
+          // Optimistically update only the relevant device_id in the readings cache
           queryClient.setQueryData<Map<string, Reading>>(
             ["readings", devicesQuery.data?.map((d) => d.id)],
             (oldReadings) => {
               if (!oldReadings) return oldReadings;
-              const newMap = new Map(oldReadings); // Create new Map to trigger re-render
+              const newMap = new Map(oldReadings); // Shallow copy to trigger re-render
 
               if (
                 payload.eventType === "INSERT" ||
@@ -117,15 +117,7 @@ export function useRealtimeDevices(enabled: boolean = true) {
                 ) {
                   newMap.set(newReading.device_id, newReading);
                 }
-              } else if (payload.eventType === "DELETE") {
-                const deletedReading = payload.old as Reading;
-                newMap.delete(deletedReading.device_id);
-                // Optionally refetch to get the new latest if deleted was the latest
-                queryClient.invalidateQueries({
-                  queryKey: ["readings", devicesQuery.data?.map((d) => d.id)],
-                });
               }
-
               return newMap;
             }
           );
