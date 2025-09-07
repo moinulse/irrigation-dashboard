@@ -1,86 +1,145 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
-import type { Device, Reading, DeviceLatest } from '@/lib/types';
-
-async function fetchLatestDevicesData(): Promise<DeviceLatest[]> {
-  const { data: devices, error: devicesError } = await supabase
-    .from("devices")
-    .select("id, esp_id, name")
-    .order("name", { ascending: true });
-
-  if (devicesError) throw devicesError;
-  if (!devices) return [];
-
-  const ids = devices.map((d) => d.id);
-  
-  if (ids.length === 0) return [];
-
-  const { data: readings, error: readingsError } = await supabase
-    .from("readings")
-    .select(
-      `
-      id, device_id, created_at,
-      soil_1, soil_2, soil_3, soil_4,
-      temp_1, hum_1, temp_2, hum_2
-    `
-    )
-    .in("device_id", ids)
-    .order("created_at", { ascending: false });
-
-  if (readingsError) throw readingsError;
-
-  const latestById = new Map<string, Reading>();
-  (readings || []).forEach((r) => {
-    if (!latestById.has(r.device_id)) latestById.set(r.device_id, r);
-  });
-
-  return (devices as Device[]).map((d) => ({
-    ...d,
-    latest: latestById.get(d.id) || null,
-  }));
-}
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
+import { supabase } from "@/lib/supabase";
+import type { Device, Reading, DeviceLatest } from "@/lib/types";
 
 export function useRealtimeDevices(enabled: boolean = true) {
   const queryClient = useQueryClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const subscriptionRef = useRef<any>(null);
 
-  const query = useQuery({
+  const devicesQuery = useQuery({
     queryKey: ["devices"],
-    queryFn: fetchLatestDevicesData,
+    queryFn: async (): Promise<Device[]> => {
+      const { data, error } = await supabase
+        .from("devices")
+        .select("id, esp_id, name")
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
     enabled,
-    refetchInterval: enabled ? 2 * 60 * 1000 : false, // 2 minutes
+    staleTime: Infinity, // Devices don't change, so never refetch automatically
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  const readingsQuery = useQuery({
+    queryKey: ["readings", devicesQuery.data?.map((d) => d.id)],
+    queryFn: async (): Promise<Map<string, Reading>> => {
+      if (!devicesQuery.data || devicesQuery.data.length === 0)
+        return new Map();
+      const ids = devicesQuery.data.map((d) => d.id);
+      const { data, error } = await supabase
+        .from("readings")
+        .select(
+          `
+          id, device_id, created_at,
+          soil_1, soil_2, soil_3, soil_4,
+          temp_1, hum_1, temp_2, hum_2
+        `
+        )
+        .in("device_id", ids)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+
+      const latestById = new Map<string, Reading>();
+      (data || []).forEach((r) => {
+        if (!latestById.has(r.device_id)) latestById.set(r.device_id, r);
+      });
+      return latestById;
+    },
+    enabled: enabled && !!devicesQuery.data,
+    refetchInterval: enabled ? 2 * 60 * 1000 : false,
     staleTime: 2000,
   });
 
+  const devices: DeviceLatest[] =
+    devicesQuery.data?.map((d) => ({
+      ...d,
+      latest: readingsQuery.data?.get(d.id) || null,
+    })) || [];
+
   // Integrate realtime subscription with query lifecycle
   useEffect(() => {
-    // Subscribe to changes in readings table only
-    const readingsChannel = supabase
+    if (!enabled) {
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
+      return;
+    }
+
+    if (subscriptionRef.current) return; // Already subscribed
+
+    subscriptionRef.current = supabase
       .channel("readings-changes")
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*", // Listen to INSERT, UPDATE, DELETE for completeness
           schema: "public",
           table: "readings",
         },
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        (_payload) => {
-          queryClient.invalidateQueries({ queryKey: ["devices"] });
+        (payload) => {
+          console.log(
+            "Readings change detected:",
+            payload.eventType,
+            payload.new || payload.old
+          );
+
+          // Optimistically update the readings cache
+          queryClient.setQueryData<Map<string, Reading>>(
+            ["readings", devicesQuery.data?.map((d) => d.id)],
+            (oldReadings) => {
+              if (!oldReadings) return oldReadings;
+              const newMap = new Map(oldReadings); // Create new Map to trigger re-render
+
+              if (
+                payload.eventType === "INSERT" ||
+                payload.eventType === "UPDATE"
+              ) {
+                const newReading = payload.new as Reading;
+                // Only update if it's the latest for this device
+                const existing = newMap.get(newReading.device_id);
+                if (
+                  !existing ||
+                  new Date(newReading.created_at) >
+                    new Date(existing.created_at)
+                ) {
+                  newMap.set(newReading.device_id, newReading);
+                }
+              } else if (payload.eventType === "DELETE") {
+                const deletedReading = payload.old as Reading;
+                newMap.delete(deletedReading.device_id);
+                // Optionally refetch to get the new latest if deleted was the latest
+                queryClient.invalidateQueries({
+                  queryKey: ["readings", devicesQuery.data?.map((d) => d.id)],
+                });
+              }
+
+              return newMap;
+            }
+          );
         }
       )
       .subscribe();
 
-    // Cleanup subscription
+    // Cleanup on unmount or enabled change
     return () => {
-      supabase.removeChannel(readingsChannel);
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
     };
-  }, [queryClient, enabled, query.data]);
+  }, [enabled, queryClient, devicesQuery.data]);
 
   return {
-    devices: query.data || [],
-    isLoading: query.isLoading,
-    error: query.error,
-    refetch: query.refetch,
+    devices,
+    isLoading: devicesQuery.isLoading || readingsQuery.isLoading,
+    error: devicesQuery.error || readingsQuery.error,
+    refetch: () => {
+      readingsQuery.refetch();
+    },
   };
 }
