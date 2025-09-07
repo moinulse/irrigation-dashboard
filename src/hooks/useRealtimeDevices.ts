@@ -6,7 +6,7 @@ import type { Device, Reading, DeviceLatest } from "@/lib/types";
 export function useRealtimeDevices(enabled: boolean = true) {
   const queryClient = useQueryClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const subscriptionRef = useRef<any>(null); 
+  const subscriptionRef = useRef<any>(null);
 
   const devicesQuery = useQuery({
     queryKey: ["devices"],
@@ -30,28 +30,36 @@ export function useRealtimeDevices(enabled: boolean = true) {
       if (!devicesQuery.data || devicesQuery.data.length === 0)
         return new Map();
       const ids = devicesQuery.data.map((d) => d.id);
-      const { data, error } = await supabase
-        .from("readings")
-        .select(
-          `
+      const promises = ids.map((id) =>
+        supabase
+          .from("readings")
+          .select(
+            `
           id, device_id, created_at,
           soil_1, soil_2, soil_3, soil_4,
           temp_1, hum_1, temp_2, hum_2
         `
-        )
-        .in("device_id", ids)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
+          )
+          .eq("device_id", id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+      );
+
+      const results = await Promise.all(promises);
 
       const latestById = new Map<string, Reading>();
-      (data || []).forEach((r) => {
-        if (!latestById.has(r.device_id)) latestById.set(r.device_id, r);
+      results.forEach(({ data, error }) => {
+        if (error) throw error;
+        if (data && data.length > 0) {
+          const r = data[0];
+          latestById.set(r.device_id, r);
+        }
       });
       return latestById;
     },
     enabled: enabled && !!devicesQuery.data,
     refetchInterval: enabled ? 2 * 60 * 1000 : false,
-    staleTime: 2000,
+    staleTime: 6000,
   });
 
   const devices: DeviceLatest[] =
@@ -77,7 +85,7 @@ export function useRealtimeDevices(enabled: boolean = true) {
       .on(
         "postgres_changes",
         {
-          event: "*", // Listen to INSERT, UPDATE, DELETE for completeness
+          event: "*",
           schema: "public",
           table: "readings",
         },
@@ -88,12 +96,12 @@ export function useRealtimeDevices(enabled: boolean = true) {
             payload.new || payload.old
           );
 
-          // Optimistically update the readings cache
+          // Optimistically update only the relevant device_id in the readings cache
           queryClient.setQueryData<Map<string, Reading>>(
             ["readings", devicesQuery.data?.map((d) => d.id)],
             (oldReadings) => {
               if (!oldReadings) return oldReadings;
-              const newMap = new Map(oldReadings); // Create new Map to trigger re-render
+              const newMap = new Map(oldReadings); // Shallow copy to trigger re-render
 
               if (
                 payload.eventType === "INSERT" ||
@@ -109,15 +117,7 @@ export function useRealtimeDevices(enabled: boolean = true) {
                 ) {
                   newMap.set(newReading.device_id, newReading);
                 }
-              } else if (payload.eventType === "DELETE") {
-                const deletedReading = payload.old as Reading;
-                newMap.delete(deletedReading.device_id);
-                // Optionally refetch to get the new latest if deleted was the latest
-                queryClient.invalidateQueries({
-                  queryKey: ["readings", devicesQuery.data?.map((d) => d.id)],
-                });
               }
-
               return newMap;
             }
           );
