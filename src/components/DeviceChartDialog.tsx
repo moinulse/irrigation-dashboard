@@ -161,7 +161,7 @@ export default function DeviceChartDialog({ device, children }: DeviceChartDialo
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[100vw] w-[98vw] max-h-[98vh] h-[96vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2">
@@ -176,8 +176,8 @@ export default function DeviceChartDialog({ device, children }: DeviceChartDialo
           {isLoading ? (
             <div className="space-y-4">
               <Skeleton className="h-8 w-48" />
-              <Skeleton className="h-80 w-full" />
-              <Skeleton className="h-80 w-full" />
+              <Skeleton className="h-[28vh] w-full" />
+              <Skeleton className="h-[28vh] w-full" />
             </div>
           ) : error ? (
             <div className="text-center py-8">
@@ -203,6 +203,12 @@ export default function DeviceChartDialog({ device, children }: DeviceChartDialo
                         dataKey="timestamp" 
                         tick={{ fontSize: 12 }}
                         interval="preserveStartEnd"
+                        tickFormatter={(value: string | number) => {
+                          const s = String(value);
+                          const timePart = s.split(" ")[1] || s; // expects "MM/dd HH:mm"
+                          const hour = timePart.split(":")[0] || s;
+                          return hour; // e.g., "14"
+                        }}
                       />
                       <YAxis 
                         domain={[0, 100]}
@@ -237,6 +243,12 @@ export default function DeviceChartDialog({ device, children }: DeviceChartDialo
                         dataKey="timestamp" 
                         tick={{ fontSize: 12 }}
                         interval="preserveStartEnd"
+                        tickFormatter={(value: string | number) => {
+                          const s = String(value);
+                          const timePart = s.split(" ")[1] || s;
+                          const hour = timePart.split(":")[0] || s;
+                          return hour;
+                        }}
                       />
                       <YAxis 
                         tick={{ fontSize: 12 }}
@@ -270,6 +282,12 @@ export default function DeviceChartDialog({ device, children }: DeviceChartDialo
                         dataKey="timestamp" 
                         tick={{ fontSize: 12 }}
                         interval="preserveStartEnd"
+                        tickFormatter={(value: string | number) => {
+                          const s = String(value);
+                          const timePart = s.split(" ")[1] || s;
+                          const hour = timePart.split(":")[0] || s;
+                          return hour;
+                        }}
                       />
                       <YAxis 
                         domain={[0, 100]}
