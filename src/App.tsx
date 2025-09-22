@@ -6,6 +6,7 @@ import ExportCSVDialog from "@/components/ExportCSVDialog";
 import { useRealtimeDevices } from "@/hooks/useRealtimeDevices";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import Presentation from "./components/Presentation";
 
 export default function App() {
   const [sessionChecked, setSessionChecked] = useState(false);
@@ -41,8 +42,8 @@ export default function App() {
       <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <div className="size-5 rounded bg-primary" />
-            <h1 className="text-lg font-semibold">Tuaran Sabah Farm</h1>
+            <div className="size-5 rounded bg-amber-600" />
+            <h1 className="text-lg font-semibold">Smart Farm Demo</h1>
           </div>
           <div className="flex items-center gap-2">
             <ExportCSVDialog />
@@ -54,7 +55,8 @@ export default function App() {
       </header>
 
       {/* Content */}
-      <main className="mx-auto max-w-6xl p-4">
+      <main className="mx-auto max-w-7xl p-2">
+        <Presentation />
         {isLoading && devices.length === 0 ? (
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -63,10 +65,7 @@ export default function App() {
           </div>
         ) : (
           <>
-            <p className="mb-3 text-sm text-muted-foreground">
-              Showing {devices.length} zones
-            </p>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            <div className="grid gap-4 grid-cols-1">
               {devices.map((d) => (
                 <DeviceCard key={d.id} device={d} />
               ))}

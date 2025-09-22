@@ -3,11 +3,9 @@ import {
   Card,
   CardContent,
   CardHeader,
-  CardTitle,
   CardFooter,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import DeviceChartDialog from "./DeviceChartDialog";
 import type { DeviceLatest } from "@/lib/types";
 
@@ -20,15 +18,15 @@ export default function DeviceCard({ device }: { device: DeviceLatest }) {
     <DeviceChartDialog device={device}>
       <Card className="cursor-pointer hover:shadow-lg transition-shadow">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">{device.name}</CardTitle>
-            <Badge variant="outline">{device.esp_id}</Badge>
-          </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Status:</span>
-            <Badge 
+            <Badge
               variant={stale ? "destructive" : "default"}
-              className={stale ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"}
+              className={
+                stale
+                  ? "bg-red-500 hover:bg-red-600"
+                  : "bg-green-500 hover:bg-green-600"
+              }
             >
               {stale ? "Stale" : "Fresh"}
             </Badge>
@@ -38,20 +36,22 @@ export default function DeviceCard({ device }: { device: DeviceLatest }) {
         <CardContent className="space-y-3">
           {r ? (
             <>
-              <section>
-                <div className="grid grid-cols-2 gap-2">
+              <div className="overflow-x-auto">
+                <div className="flex min-w-max items-stretch justify-center gap-2">
                   <Info type="soil" label="Soil 1" value={fmtPct(r.soil_1)} />
                   <Info type="soil" label="Soil 2" value={fmtPct(r.soil_2)} />
                   <Info type="soil" label="Soil 3" value={fmtPct(r.soil_3)} />
                   <Info type="soil" label="Soil 4" value={fmtPct(r.soil_4)} />
-                </div>
-              </section>
-
-              <Separator />
-              <section>
-                <div className="grid grid-cols-2 gap-2">
-                  <Info label="Temp 1" type="temp" value={fmtC(r.temp_1)} />
-                  <Info label="Temp 2" type="temp" value={fmtC(r.temp_2)} />
+                  <Info
+                    label="Temperature"
+                    type="temp"
+                    value={fmtC(r.temp_1)}
+                  />
+                  <Info
+                    label="Temperature 2"
+                    type="temp"
+                    value={fmtC(r.temp_2)}
+                  />
                   <Info
                     label="Humidity 1"
                     type="humidity"
@@ -63,7 +63,7 @@ export default function DeviceCard({ device }: { device: DeviceLatest }) {
                     value={fmtPct(r.hum_2)}
                   />
                 </div>
-              </section>
+              </div>
             </>
           ) : (
             <p className="text-sm text-muted-foreground">No data yet.</p>
@@ -105,9 +105,9 @@ function Info({
   }
 
   return (
-    <div className={`min-w-[100px] rounded-md border px-3 py-2 ${colorClass}`}>
-      <div className="text-[11px] opacity-70">{label}</div>
-      <div className="font-medium">{value}</div>
+    <div className={`w-36 rounded-md border px-4 py-3 ${colorClass}`}>
+      <div className="text-[11px] opacity-70 mb-1">{label}</div>
+      <div className="text-2xl font-semibold leading-tight">{value}</div>
     </div>
   );
 }
