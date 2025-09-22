@@ -37,15 +37,15 @@ interface ChartDataPoint {
 }
 
 async function fetchDeviceHistory(deviceId: string): Promise<Reading[]> {
-  // Calculate date 7 days ago
-  const oneWeekAgo = new Date();
-  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  // Calculate date 24 hours ago
+  const oneDayAgo = new Date();
+  oneDayAgo.setHours(oneDayAgo.getHours() - 24);
   
   const { data, error } = await supabase
     .from("readings")
     .select("*")
     .eq("device_id", deviceId)
-    .gte("created_at", oneWeekAgo.toISOString())
+    .gte("created_at", oneDayAgo.toISOString())
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -96,16 +96,15 @@ export default function DeviceChartDialog({ device, children }: DeviceChartDialo
     }
   };
 
-  // Transform data for charts - calculate 3-hour averages
+  // Transform data for charts - calculate hourly averages (last 24 hours)
   const chartData: ChartDataPoint[] = (() => {
-    // Group readings by 3-hour periods
+    // Group readings by hour
     const groupedData = new Map<string, Reading[]>();
     
     readings.forEach(reading => {
       const date = new Date(reading.created_at);
-      // Round down to nearest 3-hour period
-      const hours = Math.floor(date.getHours() / 3) * 3;
-      date.setHours(hours, 0, 0, 0);
+      // Round down to the start of the hour
+      date.setMinutes(0, 0, 0);
       const key = date.toISOString();
       
       if (!groupedData.has(key)) {
@@ -114,33 +113,36 @@ export default function DeviceChartDialog({ device, children }: DeviceChartDialo
       groupedData.get(key)!.push(reading);
     });
     
-    // Calculate averages for each 3-hour period
+    // Calculate averages for each hour
     const result: ChartDataPoint[] = [];
     
     groupedData.forEach((readings, timestamp) => {
       const date = new Date(timestamp);
       
-      // Calculate soil moisture average (from soil_1, soil_2, soil_3, soil_4)
-      const soilValues = readings.flatMap(r => [r.soil_1, r.soil_2, r.soil_3, r.soil_4])
-        .filter((val): val is number => val !== null && val !== undefined);
-      const avgSoilMoisture = soilValues.length > 0 
-        ? Math.round((soilValues.reduce((sum, val) => sum + val, 0) / soilValues.length) * 10) / 10
-        : undefined;
-      
-      // Calculate temperature average (from temp_1, temp_2)
-      const tempValues = readings.flatMap(r => [r.temp_1, r.temp_2])
-        .filter((val): val is number => val !== null && val !== undefined);
-      const avgTemperature = tempValues.length > 0 
-        ? Math.round((tempValues.reduce((sum, val) => sum + val, 0) / tempValues.length) * 10) / 10
-        : undefined;
-      
-      // Calculate humidity average (from hum_1, hum_2)
-      const humValues = readings.flatMap(r => [r.hum_1, r.hum_2])
-        .filter((val): val is number => val !== null && val !== undefined);
-      const avgHumidity = humValues.length > 0 
-        ? Math.round((humValues.reduce((sum, val) => sum + val, 0) / humValues.length) * 10) / 10
-        : undefined;
-      
+      const soilValues = readings
+        .flatMap(r => [r.soil_1, r.soil_2, r.soil_3, r.soil_4])
+        .filter((v): v is number => v != null);
+      const avgSoilMoisture =
+        soilValues.length > 0
+          ? Math.round((soilValues.reduce((s, v) => s + v, 0) / soilValues.length) * 10) / 10
+          : undefined;
+
+      const tempValues = readings
+        .flatMap(r => [r.temp_1, r.temp_2])
+        .filter((v): v is number => v != null);
+      const avgTemperature =
+        tempValues.length > 0
+          ? Math.round((tempValues.reduce((s, v) => s + v, 0) / tempValues.length) * 10) / 10
+          : undefined;
+
+      const humValues = readings
+        .flatMap(r => [r.hum_1, r.hum_2])
+        .filter((v): v is number => v != null);
+      const avgHumidity =
+        humValues.length > 0
+          ? Math.round((humValues.reduce((s, v) => s + v, 0) / humValues.length) * 10) / 10
+          : undefined;
+
       result.push({
         timestamp: format(date, "MM/dd HH:mm"),
         datetime: date,
@@ -149,7 +151,7 @@ export default function DeviceChartDialog({ device, children }: DeviceChartDialo
         avgHumidity,
       });
     });
-    
+
     // Sort by datetime (oldest to newest)
     return result.sort((a, b) => a.datetime.getTime() - b.datetime.getTime());
   })();
@@ -164,7 +166,7 @@ export default function DeviceChartDialog({ device, children }: DeviceChartDialo
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
-              {device.name} - 3-Hour Averages (Last 7 Days)
+              {device.name} - Hourly Averages (Last 24 Hours)
             </DialogTitle>
             <Badge variant="outline">{device.esp_id}</Badge>
           </div>
@@ -292,7 +294,7 @@ export default function DeviceChartDialog({ device, children }: DeviceChartDialo
               </div>
 
               <div className="text-sm text-muted-foreground text-center">
-                Showing {chartData.length} data points (3-hour averages from the last 7 days)
+                Showing {chartData.length} data points (hourly averages from the last 24 hours)
               </div>
             </>
           )}
